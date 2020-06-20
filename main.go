@@ -9,7 +9,5 @@ import (
 func main() {
 	fmt.Println("Customer API starting")
 	r := customer.SetupRouter()
-	r.Run(":2019")
-	log.Fatal()
-
+	log.Fatal(r.Run(":2019"))
 }
