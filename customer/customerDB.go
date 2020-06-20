@@ -5,33 +5,41 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"github.com/nuttaphon-rd/finalexam/errors"
 	_ "github.com/lib/pq"
 )
 
-var db *sql.DB
-
-func init() {
-	var err error
-	db, err = sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err = createTableCustomerDB(); err != nil {
-		log.Fatalf("can't create table customers: %s", err)
-	}
+type CustomerServicer interface {
+	createTableCustomerDB() error
+	CreateCustomerDB(*Customer) *errors.Error
+	GetCustomerByIdDB(string) (*Customer, *errors.Error)
+	GetAllCustomerDB() ([]*Customer, *errors.Error)
+	UpdateCustomerDB(Customer, string) (*Customer, *errors.Error)
+	DeleteCustomerDB(string) *errors.Error
 }
 
-func createTableCustomerDB() error {
+type CustomerService struct {
+	db *sql.DB
+}
+
+func NewService(db *sql.DB) CustomerServicer {
+	customerService := &CustomerService{db}
+
+	if err := customerService.createTableCustomerDB(); err != nil {
+		log.Fatalf("can't create table customers: %s", err)
+	}
+
+	return customerService
+}
+
+func (cs *CustomerService) createTableCustomerDB() error {
 	createTb := `CREATE TABLE IF NOT EXISTS customers(
 		id SERIAL PRIMARY KEY,
 		name TEXT,
 		email TEXT,
 		status TEXT
 		);`
-	_, err := db.Exec(createTb)
+	_, err := cs.db.Exec(createTb)
 	if err != nil {
 		return err
 	}
@@ -39,8 +47,8 @@ func createTableCustomerDB() error {
 	return nil
 }
 
-func CreateCustomerDB(c *Customer) *errors.Error {
-	row := db.QueryRow("INSERT INTO customers (name, email,status) values ($1, $2, $3)  RETURNING id", c.Name, c.Email, c.Status)
+func (cs *CustomerService) CreateCustomerDB(c *Customer) *errors.Error {
+	row := cs.db.QueryRow("INSERT INTO customers (name, email,status) values ($1, $2, $3)  RETURNING id", c.Name, c.Email, c.Status)
 
 	err := row.Scan(&c.ID)
 	if err != nil {
@@ -52,8 +60,8 @@ func CreateCustomerDB(c *Customer) *errors.Error {
 	return nil
 }
 
-func GetCustomerByIdDB(id string) (*Customer, *errors.Error) {
-	stmt, err := db.Prepare(`SELECT id, name, email, status FROM customers WHERE id= $1`)
+func (cs *CustomerService) GetCustomerByIdDB(id string) (*Customer, *errors.Error) {
+	stmt, err := cs.db.Prepare(`SELECT id, name, email, status FROM customers WHERE id= $1`)
 	if err != nil {
 		return nil, &errors.Error{
 			Code:    http.StatusInternalServerError,
@@ -74,8 +82,8 @@ func GetCustomerByIdDB(id string) (*Customer, *errors.Error) {
 	return cus, nil
 }
 
-func GetAllCustomerDB() ([]*Customer, *errors.Error) {
-	stmt, err := db.Prepare(`SELECT id, name, email, status FROM customers`)
+func (cs *CustomerService) GetAllCustomerDB() ([]*Customer, *errors.Error) {
+	stmt, err := cs.db.Prepare(`SELECT id, name, email, status FROM customers`)
 	if err != nil {
 		return nil, &errors.Error{
 			Code:    http.StatusInternalServerError,
@@ -108,12 +116,12 @@ func GetAllCustomerDB() ([]*Customer, *errors.Error) {
 	return customers, nil
 }
 
-func UpdateCustomerDB(c Customer, id string) (*Customer, *errors.Error) {
-	if _, err := GetCustomerByIdDB(id); err != nil {
+func (cs *CustomerService) UpdateCustomerDB(c Customer, id string) (*Customer, *errors.Error) {
+	if _, err := cs.GetCustomerByIdDB(id); err != nil {
 		return nil, err
 	}
 
-	stmt, err := db.Prepare(`UPDATE customers SET name=$2,email=$3,status=$4 WHERE id=$1`)
+	stmt, err := cs.db.Prepare(`UPDATE customers SET name=$2,email=$3,status=$4 WHERE id=$1`)
 	if err != nil {
 		return nil, &errors.Error{
 			Code:    http.StatusInternalServerError,
@@ -122,7 +130,7 @@ func UpdateCustomerDB(c Customer, id string) (*Customer, *errors.Error) {
 	}
 
 	if res, err := stmt.Exec(id, c.Name, c.Email, c.Status); err != nil {
-		fmt.Printf("result update : %s",res)
+		fmt.Printf("result update : %s", res)
 		return nil, &errors.Error{
 			Code:    http.StatusInternalServerError,
 			Message: "Error can't exec statement in update customer " + err.Error(),
@@ -131,14 +139,14 @@ func UpdateCustomerDB(c Customer, id string) (*Customer, *errors.Error) {
 
 	customer := &Customer{}
 	var errE *errors.Error
-	if customer, errE = GetCustomerByIdDB(id); errE != nil {
+	if customer, errE = cs.GetCustomerByIdDB(id); errE != nil {
 		return nil, errE
 	}
 	return customer, nil
 }
 
-func DeleteCustomerDB(id string) *errors.Error {
-	stmt, err := db.Prepare("DELETE FROM customers WHERE id = $1")
+func (cs *CustomerService) DeleteCustomerDB(id string) *errors.Error {
+	stmt, err := cs.db.Prepare("DELETE FROM customers WHERE id = $1")
 	if err != nil {
 		return &errors.Error{
 			Code:    http.StatusInternalServerError,
