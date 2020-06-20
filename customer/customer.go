@@ -1,14 +1,10 @@
 package customer
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/nuttaphon-rd/finalexam/errors"
-	"github.com/nuttaphon-rd/finalexam/middleware"
-	"log"
 	"net/http"
-	"os"
 )
 
 type CustomerHandler interface {
@@ -21,6 +17,10 @@ type CustomerHandler interface {
 
 type CustomerHandle struct {
 	Service CustomerServicer
+}
+
+func NewHandle(s CustomerServicer) CustomerHandle {
+	return CustomerHandle{s}
 }
 
 func (ch *CustomerHandle) CreateCustomer(c *gin.Context) {
@@ -86,28 +86,4 @@ func (ch *CustomerHandle) DeleteCustomer(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "customer deleted"})
-}
-
-func SetupRouter() *gin.Engine {
-	r := gin.Default()
-	r.Use(middleware.AuthMiddleware)
-
-	var err error
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	s := NewService(db)
-	h := CustomerHandle{s}
-
-	customer := r.Group("/customers")
-
-	customer.POST("/", h.CreateCustomer)
-	customer.GET("/:id", h.GetCustomerById)
-	customer.GET("/", h.GetAllCustomer)
-	customer.PUT("/:id", h.UpdateCustomer)
-	customer.DELETE("/:id", h.DeleteCustomer)
-
-	return r
 }
