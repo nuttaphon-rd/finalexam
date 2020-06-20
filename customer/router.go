@@ -6,10 +6,11 @@ import (
 	"github.com/nuttaphon-rd/finalexam/middleware"
 	"log"
 	"os"
+
+	_ "github.com/lib/pq"
 )
 
-func SetupRouter() *gin.Engine {
-	r := gin.Default()
+func SetupRoutes(r *gin.Engine)  {
 	r.Use(middleware.AuthMiddleware)
 
 	var err error
@@ -29,5 +30,4 @@ func SetupRouter() *gin.Engine {
 	customer.PUT("/:id", h.UpdateCustomer)
 	customer.DELETE("/:id", h.DeleteCustomer)
 
-	return r
 }

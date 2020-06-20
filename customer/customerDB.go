@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"github.com/nuttaphon-rd/finalexam/errors"
-	_ "github.com/lib/pq"
 )
 
 type CustomerServicer interface {
